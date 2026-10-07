@@ -6,7 +6,10 @@ import { readFileSync } from 'node:fs';
 import { createPublicClient, http, encodeAbiParameters, decodeFunctionResult, encodeFunctionData, keccak256, toHex } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
-const RPCS = (process.env.ARC_RPC || 'https://rpc.mainnet.arc.io,https://rpc.blockdaemon.mainnet.arc.io').split(',');
+const RPCS = (process.env.ARC_RPC || 'https://rpc.blockdaemon.mainnet.arc.io,https://rpc.mainnet.arc.io,https://arc.drpc.org').split(',');
+// Arc's official RPC reports its own throttle as "Request exceeds defined limit" / "Missing or invalid parameters": an
+// unusable RPC, never a test result.
+const THROTTLE = /exceeds defined limit|rate limit|too many requests|429|missing or invalid parameters|timed? ?out|fetch failed/i;
 const USDC = '0x3600000000000000000000000000000000000000';
 const SHOP = '0x00000000000000000000000000000000005a1e51';
 const HARNESS = '0x00000000000000000000000000000000a4c4e55e';
@@ -69,7 +72,7 @@ for (const rpc of RPCS) {
   } catch (e) {
     const msg = (e.shortMessage || e.message || String(e)).split('\n')[0];
     const detail = e.cause?.reason || e.details || '';
-    if (prepared) {
+    if (prepared && !THROTTLE.test(msg + ' ' + detail)) {
       // The planted fault (a stranger's signature presented as the agent's) must be refused by USDC's own check,
       // i.e. by the box answering "no" to EIP-1271. Failing anywhere else does not count as catching it.
       const text = msg + ' ' + detail;
@@ -78,6 +81,7 @@ for (const rpc of RPCS) {
       process.exit(caught ? 0 : 1);
     }
     lastErr = e;
+    prepared = false;
     console.log(`rpc ${rpc} unusable: ${msg}`);
   }
 }

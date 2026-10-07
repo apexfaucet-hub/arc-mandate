@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 /// @notice The parts of Arc's USDC (0x3600…0000, the ERC-20 face of the native gas token, 6 decimals) this box uses.
 interface IArcUSDC {
@@ -18,18 +19,22 @@ interface IArcUSDC {
  * The owner puts USDC in and writes the rules: which agent may spend, the most it may pay at once, how many payments
  * it may make per UTC day, which payees it may pay (or any), and until when. The agent then pays on its own, inside
  * those rules. A payment that breaks a rule is refused by this contract. The owner can stop the agent, change the
- * rules or take the money out at any time; nobody else can. There is no admin, no fee and no upgrade.
+ * rules or take the money out at any time; nobody else can. There is no admin, no fee and no upgrade. (Circle, as
+ * USDC's issuer, can still pause USDC or block an address; that stops agent and owner alike.)
  *
  * Two ways for the agent to pay, both checked against the same rules and the same daily slots:
  *   1. pay(to, value, slot, ref): the agent calls the box, the box sends USDC. Any seller that accepts a plain Arc
  *      USDC transfer can be paid this way.
  *   2. Standard x402 "exact" payments (EIP-3009 transferWithAuthorization, from = this box). Arc's USDC asks this
  *      box (EIP-1271) whether the payment is authorised. The box says yes only when the agent signed exactly that
- *      transfer and the transfer fits the rules.
+ *      transfer and the transfer fits the rules. The seller's facilitator must verify the payer with EIP-1271 (not
+ *      plain ecrecover) and settle with the bytes-signature overload.
  *
  * Daily limit: every payment uses one of today's numbered slots (0 … maxPaymentsPerDay-1). A slot is a USDC
- * authorization nonce, so Arc's USDC itself refuses to use one twice, whichever way it was spent. Today's spend is
- * therefore at most maxPaymentsPerDay × maxPerPayment. Days are UTC days (block.timestamp / 86400).
+ * authorization nonce. A slot spent through x402 is recorded by Arc's USDC (authorizationState); a slot spent through
+ * pay() is recorded here (usedByPay), and each path checks the other's record, so no slot is used twice. Outside
+ * readers should ask slotUsed(), not USDC alone. Today's spend is therefore at most maxPaymentsPerDay × maxPerPayment.
+ * Days are UTC days (block.timestamp / 86400): an authorization signed for one day is refused after midnight UTC.
  */
 contract MandateBox {
     /// @dev EIP-3009, as used by Arc's USDC (FiatToken v2.2).
@@ -38,8 +43,13 @@ contract MandateBox {
     );
     bytes4 internal constant ERC1271_MAGIC = 0x1626ba7e;
     bytes4 internal constant ERC1271_NO = 0xffffffff;
-    /// @notice Upper bound on maxPaymentsPerDay, so every view over today's slots stays cheap.
+    /// @notice Upper bound on maxPaymentsPerDay, so the views over today's slots stay bounded (about 6.5M gas at 1000).
     uint256 public constant MAX_PAYMENTS_PER_DAY = 1000;
+    /// @notice Sanity ceiling on maxPerPayment: 1,000,000 USDC. Refuses an 18-decimal amount typed by habit
+    /// (1 ether as a "1 USDC" cap would allow 10^12 USDC).
+    uint256 public constant MAX_PER_PAYMENT = 1_000_000 * 1e6;
+    /// @notice Sanity ceiling on expiresAt: ten years from now. Refuses a millisecond timestamp typed by habit.
+    uint256 public constant MAX_DURATION = 3650 days;
     string public constant VERSION = "arc-mandate-1";
 
     /// @notice Why a payment would be refused (0 = it would be accepted). Returned by explain().
@@ -95,6 +105,9 @@ contract MandateBox {
     error BadAgent();
     error BadPayee();
     error TooManyPaymentsPerDay();
+    error PerPaymentTooHigh();
+    error ExpiryTooFar();
+    error NotInitialized();
     error Refused(Refusal reason);
     error TransferFailed();
 
@@ -104,7 +117,9 @@ contract MandateBox {
     }
 
     /// @dev Deployed once by the factory as the implementation that clones run. The implementation itself can never
-    /// be initialised, so it can never hold rules or money.
+    /// be initialised, so it never has an owner or rules, and refuses plain native deposits. (An ERC-20 transfer
+    /// through 0x3600 runs no recipient code, so USDC sent to the implementation that way would be stranded: send
+    /// money to a box, never to the implementation.)
     constructor(address usdc_) {
         if (usdc_ == address(0)) revert ZeroAddress();
         usdc = IArcUSDC(usdc_);
@@ -113,7 +128,9 @@ contract MandateBox {
     }
 
     /// @notice Native USDC sent straight to the box is a deposit.
-    receive() external payable {}
+    receive() external payable {
+        if (owner == address(0)) revert NotInitialized();
+    }
 
     /// @notice Called once by the factory, in the same transaction that creates the box.
     function initialize(
@@ -160,7 +177,8 @@ contract MandateBox {
         return _explain(hash, signature) == Refusal.None ? ERC1271_MAGIC : ERC1271_NO;
     }
 
-    /// @notice Same check as isValidSignature, but says why a payment would be refused.
+    /// @notice Same check as isValidSignature, but says why a payment would be refused. Input that cannot be decoded
+    /// makes it revert (isValidSignature then reverts too, which USDC reads as "no").
     function explain(bytes32 hash, bytes calldata signature) external view returns (Refusal) {
         return _explain(hash, signature);
     }
@@ -268,8 +286,16 @@ contract MandateBox {
         // Only a USDC transfer out of this box, with exactly these terms and today's slot nonce, is ever approved.
         // Any other digest (a permit, a cancel, another token, another chain) is refused here.
         if (_transferDigest(t, nonce) != hash) return Refusal.NotThisTransfer;
-        if (!SignatureChecker.isValidSignatureNow(a, hash, t.agentSig)) return Refusal.BadAgentSignature;
+        if (!_signedByAgent(a, hash, t.agentSig)) return Refusal.BadAgentSignature;
         return Refusal.None;
+    }
+
+    /// @dev The agent's own key first (an EOA, or an EOA with EIP-7702 code that has no isValidSignature), then
+    /// EIP-1271 for a smart-wallet agent.
+    function _signedByAgent(address a, bytes32 hash, bytes memory sig) internal view returns (bool) {
+        (address rec, ECDSA.RecoverError err,) = ECDSA.tryRecover(hash, sig);
+        if (err == ECDSA.RecoverError.NoError && rec == a) return true;
+        return a.code.length != 0 && SignatureChecker.isValidERC1271SignatureNow(a, hash, sig);
     }
 
     function _decode(bytes calldata signature) internal pure returns (Terms memory t) {
@@ -304,6 +330,8 @@ contract MandateBox {
     {
         if (agent_ == address(this)) revert BadAgent();
         if (maxPaymentsPerDay_ > MAX_PAYMENTS_PER_DAY) revert TooManyPaymentsPerDay();
+        if (maxPerPayment_ > MAX_PER_PAYMENT) revert PerPaymentTooHigh();
+        if (expiresAt_ > block.timestamp + MAX_DURATION) revert ExpiryTooFar();
         agent = agent_;
         maxPerPayment = maxPerPayment_;
         maxPaymentsPerDay = maxPaymentsPerDay_;

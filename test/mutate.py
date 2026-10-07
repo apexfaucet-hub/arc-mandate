@@ -15,7 +15,12 @@ M=[
  ('src/MandateBox.sol','if (_initialized) revert AlreadyInitialized();','','re-initialise allowed'),
  ('src/MandateBox.sol','if (slot >= maxPaymentsPerDay) return (Refusal.OverDailyCount, 0);','','daily count removed'),
  ('src/MandateBox.sol','if (block.timestamp >= expiresAt) return (Refusal.Expired, 0);','','expiry ignored'),
- ('src/MandateBox.sol','if (!SignatureChecker.isValidSignatureNow(a, hash, t.agentSig)) return Refusal.BadAgentSignature;','','agent signature not checked'),
+ ('src/MandateBox.sol','if (!_signedByAgent(a, hash, t.agentSig)) return Refusal.BadAgentSignature;','','agent signature not checked'),
+ ('src/MandateBox.sol','if (err == ECDSA.RecoverError.NoError && rec == a) return true;','if (err == ECDSA.RecoverError.NoError) return true;','any recovered key accepted'),
+ ('src/MandateBox.sol','if (err == ECDSA.RecoverError.NoError && rec == a) return true;','','EOA path removed (7702 agent)'),
+ ('src/MandateBox.sol','if (maxPerPayment_ > MAX_PER_PAYMENT) revert PerPaymentTooHigh();','','per-payment ceiling removed'),
+ ('src/MandateBox.sol','if (expiresAt_ > block.timestamp + MAX_DURATION) revert ExpiryTooFar();','','expiry ceiling removed'),
+ ('src/MandateBox.sol','if (owner == address(0)) revert NotInitialized();','','implementation takes deposits'),
 ]
 bad=0
 for f,old,new,label in M:

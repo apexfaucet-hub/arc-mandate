@@ -9,8 +9,9 @@ import {MandateBox} from "./MandateBox.sol";
  * @notice Creates MandateBoxes. The caller becomes the box's owner. Native USDC sent with create() goes straight into
  * the new box, so creating and funding a box is one transaction with no approval.
  *
- * The factory has no owner, no fee and no switch. It never holds money: whatever value arrives with create() is
- * passed to the box in the same call, and it refuses plain transfers.
+ * The factory has no owner, no fee and no switch. Whatever value arrives with create() is passed to the box in the
+ * same call, and it refuses plain transfers. (Like any contract it can be force-sent value by a selfdestruct; nothing
+ * can take that out, and nothing in the factory reads its own balance.)
  */
 contract MandateFactory {
     address public immutable usdc;

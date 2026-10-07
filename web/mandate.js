@@ -134,6 +134,7 @@
     else if (!any && !payees.length) err = 'Add at least one payee address, or tick "any service".';
     else if (payees.some(function (p) { return !isAddr(p); })) err = 'One of the payee lines is not a 0x address.';
     else if (!end || end <= Date.now() / 1000) err = 'Pick an end date in the future.';
+    else if (end > Date.now() / 1000 + 3650 * 86400) err = 'The end date can be at most ten years away.';
     else if (put == null) err = 'The amount to put in must be a number, for example 2.';
     return { err: err, agent: agent, per: per, n: n, any: any, payees: any ? [] : payees, end: end, put: put || 0n };
   }

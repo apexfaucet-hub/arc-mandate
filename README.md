@@ -69,7 +69,7 @@ the owner. `predict(owner, salt)` gives the address in advance; `isMandate(box)`
 ## Tests
 
 ```bash
-forge test                       # 33 unit + fuzz tests (2,000 random runs of everything an agent can try in a day)
+forge test                       # 36 unit + fuzz tests (2,000 random runs of everything an agent can try in a day)
 forge build && node test/arc/run.mjs          # the whole story on Arc mainnet's REAL USDC, inside one eth_call (nothing broadcast)
 node test/arc/run.mjs --plant                 # a stranger's signature presented as the agent's: must be refused by USDC + box
 node test/sdk/fork.mjs                        # SDK against an anvil fork of Arc (reads, signing, the box's verdicts)
@@ -79,7 +79,7 @@ sudo env NODE_PATH=… node test/web/e2e-fork.cjs   # the page in headless Chrom
 Arc's USDC moves balances through a native module that local forks cannot execute, so money movement is proven against a
 real Arc node with `eth_call` and a state override (`test/arc/`); forks are used for reads and signatures only.
 
-Every rule was also checked the other way round: 13 deliberate faults planted in the contract (payee check removed, digest
+Every rule was also checked the other way round: 18 deliberate faults planted in the contract (payee check removed, digest
 check removed, cap removed, slot not recorded, pause ignored, day dropped from the nonce, …) and each one made a test fail.
 
 ## Honest limits
@@ -87,8 +87,17 @@ check removed, cap removed, slot not recorded, pause ignored, day dropped from t
 - The daily limit counts payments: at most `maxPaymentsPerDay` of at most `maxPerPayment` each. It is not a running sum.
 - Days are UTC. An x402 authorization signed for one day is refused after midnight UTC (the SDK never signs past it).
 - Circle Gateway nanopayments are not supported: they need a signature from a Gateway depositor, not an EIP-3009 one.
-- Reviewed by its own tests and an independent AI review; not audited by a security firm. Put in what you would give the
-  agent anyway.
+- The seller's facilitator must check the payer with EIP-1271 and settle with the bytes-signature overload of
+  `transferWithAuthorization`; one that only runs `ecrecover` on a 65-byte signature will turn a box payment away.
+- The owner is fixed: there is no owner rotation. A lost owner key cannot change rules or withdraw (the agent can still
+  spend inside the rules until `expiresAt`); a stolen owner key controls the box.
+- `setRules` rewrites all five rules at once: check the agent address every time you change a limit.
+- A signed x402 authorization that nobody settled yet can be voided only by pausing, changing the rules, or spending
+  its slot; the box refuses USDC `cancelAuthorization` digests like every other foreign digest.
+- Circle, as USDC's issuer, can pause USDC or block an address; that stops the agent and the owner alike.
+- Send money to a box, never to the factory or the implementation: neither has anyone who could take it out.
+- Reviewed by its own tests, 18 planted faults and an independent AI review (Fable, 8 Oct 2026: nothing above low; the
+  four low findings are fixed); not audited by a security firm. Put in what you would give the agent anyway.
 
 ## Contracts on Arc mainnet
 

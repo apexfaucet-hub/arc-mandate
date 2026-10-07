@@ -348,6 +348,36 @@ contract MandateBoxTest is Test {
         assertEq(usdc.balanceOf(shop), CAP);
     }
 
+    /// Review L2: an agent EOA that later carries code without isValidSignature (EIP-7702) keeps the x402 path.
+    function test_x402_agentWithCodeButNo1271_stillSignsWithItsKey() public {
+        vm.etch(agent, hex"6080604052600080fd"); // code that reverts on every call
+        _settle(_sign(shop, CAP, 0, agentPk));
+        assertEq(usdc.balanceOf(shop), CAP);
+    }
+
+    /// Review L3: unit mistakes are refused instead of silently accepted.
+    function test_unitFootgunsRefused() public {
+        vm.startPrank(owner);
+        vm.expectRevert(MandateBox.PerPaymentTooHigh.selector);
+        box.setRules(agent, 1 ether, N, uint64(T0 + 30 days), false);
+        vm.expectRevert(MandateBox.ExpiryTooFar.selector);
+        box.setRules(agent, CAP, N, uint64(T0 * 1000), false);
+        box.setRules(agent, uint128(box.MAX_PER_PAYMENT()), N, uint64(T0 + 3650 days), false);
+        vm.stopPrank();
+        address[] memory none = new address[](0);
+        vm.expectRevert(MandateBox.PerPaymentTooHigh.selector);
+        factory.create(bytes32("x"), agent, 1 ether, N, uint64(T0 + 1 days), true, none);
+    }
+
+    /// Review L4: the implementation refuses plain native deposits (it has no owner who could take them out).
+    function test_implementationRefusesNativeDeposit() public {
+        address impl = factory.implementation();
+        vm.deal(stranger, 1 ether);
+        vm.prank(stranger);
+        (bool ok,) = impl.call{value: 1}("");
+        assertFalse(ok);
+    }
+
     function test_anyPayee() public {
         vm.prank(owner);
         box.setRules(agent, CAP, N, uint64(T0 + 30 days), true);

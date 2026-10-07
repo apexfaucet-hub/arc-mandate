@@ -1,66 +1,95 @@
-## Foundry
+# arc-mandate
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+**A spending box with rules for an AI agent, on Arc.**
+The owner puts USDC in and writes the rules. The agent pays for things by itself, but only inside those rules, and the
+contract checks every payment. The owner can stop the agent, change the rules or take everything back at any time. Nobody
+else can: there is no admin, no fee and no upgrade.
 
-Foundry consists of:
+Built by [apexfaucet.xyz](https://apexfaucet.xyz/arc/) (agent #1 in Arc's ERC-8004 registry). Page:
+[apexfaucet.xyz/arc/mandate/](https://apexfaucet.xyz/arc/mandate/). MIT licensed.
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## The rules a box enforces
 
-## Documentation
+| rule | how |
+|---|---|
+| which agent may spend | `agent`: an EOA or a smart-wallet (EIP-1271) agent |
+| the most one payment may move | `maxPerPayment` (USDC, 6 decimals) |
+| how many payments per UTC day | `maxPaymentsPerDay`: each payment uses one of today's numbered slots |
+| who may be paid | a payee list, or `anyPayee` |
+| until when | `expiresAt` |
+| stop button | `setPaused(true)`: also voids payments the agent already signed but nobody settled yet |
+| owner's money back | `withdraw`, `withdrawAll`, `withdrawToken`, at any time, paused or not, expired or not |
 
-https://book.getfoundry.sh/
+So today's spend is at most `maxPaymentsPerDay × maxPerPayment`, only to the list, and never after `expiresAt`, whatever the
+agent does: a buggy agent, a leaked agent key or a bad prompt cannot move more.
 
-## Usage
+## Two ways for the agent to pay, one set of rules
 
-### Build
+1. **Standard x402** (`exact`, EIP-3009). The agent signs a normal `TransferWithAuthorization` with `from = box`. Arc's
+   USDC (FiatToken v2.2 at `0x3600…0000`) asks the box through EIP-1271 whether to allow it. The box says yes only if the
+   transfer is exactly the one the agent signed, the agent is the current agent, and the transfer fits the rules *at the
+   moment it settles*. Any seller whose facilitator settles EIP-3009 with a bytes signature can take it, gasless for the
+   agent. (Checked on Arc mainnet: a contract answering `0x1626ba7e` passes, one answering `0xffffffff` reverts with
+   `FiatTokenV2: invalid signature`.)
+2. **Direct**: the agent calls `pay(to, value, slot, ref)` and the box sends USDC. Any seller that accepts a plain Arc USDC
+   transfer (replaying the transaction hash) can take it.
 
-```shell
-$ forge build
+Both paths draw from the same daily slots. A slot is a USDC authorization nonce
+`keccak256(abi.encode(box, utcDay, slot))`, so Arc's USDC itself refuses to use one twice, whichever path used it first.
+
+The signature an x402 payment carries is the box's envelope:
+`abi.encode(to, value, validAfter, validBefore, slot, agentSignature)`, where `agentSignature` is the agent's EIP-712
+signature over the same transfer. Any other digest asking the box for a signature (a permit, a cancel, another token,
+another chain, another protocol) is refused, because it cannot equal the USDC transfer digest the box rebuilds.
+
+## Use it as an agent
+
+```js
+import { createPublicClient, http } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { x402Fetch, payDirect, boxStatus } from './sdk/mandate.mjs';
+
+const pub = createPublicClient({ transport: http('https://rpc.mainnet.arc.io') });
+const agent = privateKeyToAccount(process.env.AGENT_KEY);
+const box = '0x…';                                  // the box its owner created for this agent
+
+console.log(await boxStatus(pub, box));            // rules, balance, payments left today
+const res = await x402Fetch('https://apexfaucet.xyz/api/x402/arc-gold', { pub, account: agent, box, maxUsd: 0.01 });
 ```
 
-### Test
+The SDK finds a free slot, signs, and asks the box (`explain`) before anything leaves, so a payment the box would refuse
+fails locally with its reason (`over the per-payment limit`, `payee not on the list`, `paused by the owner`, …).
 
-```shell
-$ forge test
+## Create one as an owner
+
+From the page, or directly: `MandateFactory.create(salt, agent, maxPerPayment, maxPaymentsPerDay, expiresAt, anyPayee,
+payees)` with native USDC as `msg.value`. One transaction creates the box (an EIP-1167 clone) and funds it. The caller is
+the owner. `predict(owner, salt)` gives the address in advance; `isMandate(box)` lets a seller check a payer is a real box.
+
+## Tests
+
+```bash
+forge test                       # 33 unit + fuzz tests (2,000 random runs of everything an agent can try in a day)
+forge build && node test/arc/run.mjs          # the whole story on Arc mainnet's REAL USDC, inside one eth_call (nothing broadcast)
+node test/arc/run.mjs --plant                 # a stranger's signature presented as the agent's: must be refused by USDC + box
+node test/sdk/fork.mjs                        # SDK against an anvil fork of Arc (reads, signing, the box's verdicts)
+sudo env NODE_PATH=… node test/web/e2e-fork.cjs   # the page in headless Chrome with a stand-in wallet on a fork
 ```
 
-### Format
+Arc's USDC moves balances through a native module that local forks cannot execute, so money movement is proven against a
+real Arc node with `eth_call` and a state override (`test/arc/`); forks are used for reads and signatures only.
 
-```shell
-$ forge fmt
-```
+Every rule was also checked the other way round: 13 deliberate faults planted in the contract (payee check removed, digest
+check removed, cap removed, slot not recorded, pause ignored, day dropped from the nonce, …) and each one made a test fail.
 
-### Gas Snapshots
+## Honest limits
 
-```shell
-$ forge snapshot
-```
+- The daily limit counts payments: at most `maxPaymentsPerDay` of at most `maxPerPayment` each. It is not a running sum.
+- Days are UTC. An x402 authorization signed for one day is refused after midnight UTC (the SDK never signs past it).
+- Circle Gateway nanopayments are not supported: they need a signature from a Gateway depositor, not an EIP-3009 one.
+- Reviewed by its own tests and an independent AI review; not audited by a security firm. Put in what you would give the
+  agent anyway.
 
-### Anvil
+## Contracts on Arc mainnet
 
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+Not deployed yet.

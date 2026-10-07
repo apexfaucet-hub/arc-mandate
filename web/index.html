@@ -98,14 +98,14 @@
 
   <h2>For agents and developers</h2>
   <p>The agent pays in one of two ways, both checked against the same rules and the same daily count:</p>
-  <p><b>Standard x402.</b> The agent signs a normal EIP-3009 USDC authorization with the box as the payer. Arc's USDC asks the box whether to allow it (EIP-1271), and the box says yes only when the agent signed exactly that payment and it fits the rules. Any seller whose x402 settlement passes the signature as bytes can take it.</p>
+  <p><b>Standard x402.</b> The agent signs a normal EIP-3009 USDC authorization with the box as the payer. Arc's USDC asks the box whether to allow it (EIP-1271), and the box says yes only when the agent signed exactly that payment and it fits the rules. The seller's x402 checkout must check the payer with EIP-1271 and settle with the bytes-signature version of the transfer; ours does. A checkout that only checks plain wallet signatures turns a box payment away.</p>
   <p><b>Direct.</b> The agent calls <code>pay(to, amount, slot, ref)</code> and the box sends the USDC. Any seller that accepts a plain Arc USDC transfer can take it.</p>
 <pre>import { x402Fetch } from './sdk/mandate.mjs';
 // pays a 402 on Arc from the box, inside the owner's rules
 const res = await x402Fetch('https://apexfaucet.xyz/api/x402/arc-gold',
   { pub, account: agentKey, box: '0xYourBox', maxUsd: 0.01 });</pre>
   <h2>Proof: our own agent uses one</h2>
-  <p>Our demo agent spends from <a href="https://explorer.arc.io/address/0xe879dcb80336363ff3b24f6504ffcbaca6bf50e8" target="_blank" rel="noopener">our own box</a> (our money, at most 0.01 USDC per payment, 20 payments a day, only to our shop). On 8 October 2026 it bought gold data twice and was refused once, all on Arc mainnet:</p>
+  <p>Our demo agent spends from <a href="https://explorer.arc.io/address/0xe879dcb80336363ff3b24f6504ffcbaca6bf50e8" target="_blank" rel="noopener">our own box</a> (our money, at most 0.01 USDC per payment, 20 payments a day, only to our shop). On 7 October 2026 it bought gold data twice and was refused once, all on Arc mainnet:</p>
   <ul class="mout">
     <li>standard x402, signed by the agent, approved by the box: <a href="https://explorer.arc.io/tx/0x3eecb7ff6d3a026c73c02405395e3a11ef2f3bc8ebfed90375cdbdac8dd17df7" target="_blank" rel="noopener">0.003 USDC paid</a></li>
     <li>direct payment through the box: <a href="https://explorer.arc.io/tx/0xff60c87d8dd8a688fe25996418c3a735bbdb640350d5aa2f964734e0c0fda627" target="_blank" rel="noopener">0.003 USDC paid</a></li>

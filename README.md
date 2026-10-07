@@ -28,7 +28,7 @@ agent does: a buggy agent, a leaked agent key or a bad prompt cannot move more.
 1. **Standard x402** (`exact`, EIP-3009). The agent signs a normal `TransferWithAuthorization` with `from = box`. Arc's
    USDC (FiatToken v2.2 at `0x3600…0000`) asks the box through EIP-1271 whether to allow it. The box says yes only if the
    transfer is exactly the one the agent signed, the agent is the current agent, and the transfer fits the rules *at the
-   moment it settles*. Any seller whose facilitator settles EIP-3009 with a bytes signature can take it, gasless for the
+   moment it settles*. Any seller whose facilitator checks the payer with EIP-1271 and settles with the bytes-signature overload can take it, gasless for the
    agent. (Checked on Arc mainnet: a contract answering `0x1626ba7e` passes, one answering `0xffffffff` reverts with
    `FiatTokenV2: invalid signature`.)
 2. **Direct**: the agent calls `pay(to, value, slot, ref)` and the box sends USDC. Any seller that accepts a plain Arc USDC
@@ -96,7 +96,7 @@ check removed, cap removed, slot not recorded, pause ignored, day dropped from t
   its slot; the box refuses USDC `cancelAuthorization` digests like every other foreign digest.
 - Circle, as USDC's issuer, can pause USDC or block an address; that stops the agent and the owner alike.
 - Send money to a box, never to the factory or the implementation: neither has anyone who could take it out.
-- Reviewed by its own tests, 18 planted faults and an independent AI review (Fable, 8 Oct 2026: nothing above low; the
+- Reviewed by its own tests, 18 planted faults and an independent AI review (Fable, 7 Oct 2026: nothing above low; the
   four low findings are fixed); not audited by a security firm. Put in what you would give the agent anyway.
 
 ## Contracts on Arc mainnet (chain 5042)
@@ -108,7 +108,7 @@ check removed, cap removed, slot not recorded, pause ignored, day dropped from t
 | Our own demo box (our money) | [`0xe879dcb80336363ff3b24f6504ffcbaca6bf50e8`](https://explorer.arc.io/address/0xe879dcb80336363ff3b24f6504ffcbaca6bf50e8) |
 
 The deployed factory's runtime code equals this repository's build (solc 0.8.28, optimizer 200, cancun) with immutables
-masked. Live proof, 8 Oct 2026, from `examples/demo-agent.mjs`:
+masked. Live proof, 7 Oct 2026, from `examples/demo-agent.mjs`:
 [x402 payment approved by the box](https://explorer.arc.io/tx/0x3eecb7ff6d3a026c73c02405395e3a11ef2f3bc8ebfed90375cdbdac8dd17df7),
 [direct payment](https://explorer.arc.io/tx/0xff60c87d8dd8a688fe25996418c3a735bbdb640350d5aa2f964734e0c0fda627),
 [over-limit payment refused on chain](https://explorer.arc.io/tx/0x2a2e7114306e5c4dcd4cc930a305478d65d2eb9e09460055de14cad404161bd2) (`Refused(6)`).

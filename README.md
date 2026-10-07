@@ -99,6 +99,16 @@ check removed, cap removed, slot not recorded, pause ignored, day dropped from t
 - Reviewed by its own tests, 18 planted faults and an independent AI review (Fable, 8 Oct 2026: nothing above low; the
   four low findings are fixed); not audited by a security firm. Put in what you would give the agent anyway.
 
-## Contracts on Arc mainnet
+## Contracts on Arc mainnet (chain 5042)
 
-Not deployed yet.
+| | address |
+|---|---|
+| MandateFactory | [`0x69e444f722666e13e171181efe054a93e0976b26`](https://explorer.arc.io/address/0x69e444f722666e13e171181efe054a93e0976b26) (block 24,802,686) |
+| MandateBox implementation (clones run this code) | [`0xb380369c90918baaebadd48b26e2d12def74ef9b`](https://explorer.arc.io/address/0xb380369c90918baaebadd48b26e2d12def74ef9b) |
+| Our own demo box (our money) | [`0xe879dcb80336363ff3b24f6504ffcbaca6bf50e8`](https://explorer.arc.io/address/0xe879dcb80336363ff3b24f6504ffcbaca6bf50e8) |
+
+The deployed factory's runtime code equals this repository's build (solc 0.8.28, optimizer 200, cancun) with immutables
+masked. Live proof, 8 Oct 2026, from `examples/demo-agent.mjs`:
+[x402 payment approved by the box](https://explorer.arc.io/tx/0x3eecb7ff6d3a026c73c02405395e3a11ef2f3bc8ebfed90375cdbdac8dd17df7),
+[direct payment](https://explorer.arc.io/tx/0xff60c87d8dd8a688fe25996418c3a735bbdb640350d5aa2f964734e0c0fda627),
+[over-limit payment refused on chain](https://explorer.arc.io/tx/0x2a2e7114306e5c4dcd4cc930a305478d65d2eb9e09460055de14cad404161bd2) (`Refused(6)`).

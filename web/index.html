@@ -104,10 +104,17 @@
 // pays a 402 on Arc from the box, inside the owner's rules
 const res = await x402Fetch('https://apexfaucet.xyz/api/x402/arc-gold',
   { pub, account: agentKey, box: '0xYourBox', maxUsd: 0.01 });</pre>
-  <p class="soft" id="maddrs">Contracts: not deployed yet.</p>
+  <h2>Proof: our own agent uses one</h2>
+  <p>Our demo agent spends from <a href="https://explorer.arc.io/address/0xe879dcb80336363ff3b24f6504ffcbaca6bf50e8" target="_blank" rel="noopener">our own box</a> (our money, at most 0.01 USDC per payment, 20 payments a day, only to our shop). On 8 October 2026 it bought gold data twice and was refused once, all on Arc mainnet:</p>
+  <ul class="mout">
+    <li>standard x402, signed by the agent, approved by the box: <a href="https://explorer.arc.io/tx/0x3eecb7ff6d3a026c73c02405395e3a11ef2f3bc8ebfed90375cdbdac8dd17df7" target="_blank" rel="noopener">0.003 USDC paid</a></li>
+    <li>direct payment through the box: <a href="https://explorer.arc.io/tx/0xff60c87d8dd8a688fe25996418c3a735bbdb640350d5aa2f964734e0c0fda627" target="_blank" rel="noopener">0.003 USDC paid</a></li>
+    <li>0.010001 USDC, one millionth over its limit: <a href="https://explorer.arc.io/tx/0x2a2e7114306e5c4dcd4cc930a305478d65d2eb9e09460055de14cad404161bd2" target="_blank" rel="noopener">refused by the box</a> (Refused: over the per-payment limit)</li>
+  </ul>
+  <p class="soft" id="maddrs">Contracts on Arc mainnet: factory <a href="https://explorer.arc.io/address/0x69e444f722666e13e171181efe054a93e0976b26" target="_blank" rel="noopener">0x69e444f7…6b26</a>, box code <a href="https://explorer.arc.io/address/0xb380369c90918baaebadd48b26e2d12def74ef9b" target="_blank" rel="noopener">0xb380369c…ef9b</a>. No admin, no fee, no upgrade. Code, tests and agent SDK: <a href="https://github.com/apexfaucet-hub/arc-mandate" target="_blank" rel="noopener">github.com/apexfaucet-hub/arc-mandate</a>. Reviewed by its own tests (36, plus 18 planted faults) and an independent AI review; not audited by a security firm, so put in what you would give the agent anyway.</p>
   <p class="soft">Each payment uses one of today's numbered slots, and a slot is a USDC authorization nonce, so Arc's USDC itself refuses to use one twice. Days are UTC days: an authorization signed for today is refused after midnight UTC. A box holds USDC; any other token sent to it can be taken out by the owner.</p>
 </main>
-<script>window.MANDATE={factory:null,deployBlock:0};</script>
+<script>window.MANDATE={factory:"0x69e444f722666e13e171181efe054a93e0976b26",deployBlock:24802686};</script>
 <script src="/arc/mandate/mandate.js?v=1" defer></script>
 <script src="/nav-v2.js?v=r243"></script>
 </body>

@@ -378,6 +378,20 @@ contract MandateBoxTest is Test {
         }
     }
 
+    function test_withdrawToken_onlyOwner() public {
+        MockArcUSDC eurc = new MockArcUSDC();
+        eurc.mint(address(box), 7);
+        vm.prank(agent);
+        vm.expectRevert(MandateBox.NotOwner.selector);
+        box.withdrawToken(address(eurc), agent, 7);
+        vm.prank(owner);
+        box.withdrawToken(address(eurc), owner, 7);
+        assertEq(eurc.balanceOf(owner), 7);
+        vm.prank(owner);
+        vm.expectRevert(MandateBox.TransferFailed.selector);
+        box.withdrawToken(makeAddr("no-code"), owner, 1);
+    }
+
     function test_withdrawAll_evenAfterExpiry() public {
         vm.warp(T0 + 365 days);
         vm.prank(owner);

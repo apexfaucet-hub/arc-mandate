@@ -40,6 +40,7 @@ contract MandateBox {
     bytes4 internal constant ERC1271_NO = 0xffffffff;
     /// @notice Upper bound on maxPaymentsPerDay, so every view over today's slots stays cheap.
     uint256 public constant MAX_PAYMENTS_PER_DAY = 1000;
+    string public constant VERSION = "arc-mandate-1";
 
     /// @notice Why a payment would be refused (0 = it would be accepted). Returned by explain().
     enum Refusal {
@@ -85,6 +86,7 @@ contract MandateBox {
     event PausedSet(bool paused);
     event Paid(address indexed to, uint256 value, uint256 indexed day, uint256 slot, bytes32 nonce, bytes32 ref);
     event Withdrawn(address indexed to, uint256 value);
+    event TokenWithdrawn(address indexed token, address indexed to, uint256 value);
 
     error NotOwner();
     error NotFactory();
@@ -190,6 +192,16 @@ contract MandateBox {
 
     function withdrawAll(address to) external onlyOwner {
         _withdraw(to, usdc.balanceOf(address(this)));
+    }
+
+    /// @notice Any other token sent to the box (EURC, by mistake) can only be taken out by the owner.
+    function withdrawToken(address token, address to, uint256 value) external onlyOwner {
+        if (to == address(0) || token == address(0)) revert ZeroAddress();
+        (bool ok, bytes memory ret) = token.call(abi.encodeWithSelector(IArcUSDC.transfer.selector, to, value));
+        if (!ok || (ret.length != 0 && (ret.length < 32 || abi.decode(ret, (uint256)) == 0)) || token.code.length == 0) {
+            revert TransferFailed();
+        }
+        emit TokenWithdrawn(token, to, value);
     }
 
     // ---------------------------------------------------------------- views

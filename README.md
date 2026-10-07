@@ -35,7 +35,9 @@ agent does: a buggy agent, a leaked agent key or a bad prompt cannot move more.
    transfer (replaying the transaction hash) can take it.
 
 Both paths draw from the same daily slots. A slot is a USDC authorization nonce
-`keccak256(abi.encode(box, utcDay, slot))`, so Arc's USDC itself refuses to use one twice, whichever path used it first.
+`keccak256(abi.encode(box, utcDay, slot))`. Arc's USDC records a slot spent through x402 (`authorizationState`), the box records
+a slot spent through `pay()` (`usedByPay`), and each path checks both records, so no slot is used twice. Outside readers
+should ask the box (`slotUsed`), not USDC alone.
 
 The signature an x402 payment carries is the box's envelope:
 `abi.encode(to, value, validAfter, validBefore, slot, agentSignature)`, where `agentSignature` is the agent's EIP-712

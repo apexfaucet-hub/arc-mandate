@@ -110,7 +110,8 @@ check removed, cap removed, slot not recorded, pause ignored, day dropped from t
 | Our own demo box (our money) | [`0xe879dcb80336363ff3b24f6504ffcbaca6bf50e8`](https://explorer.arc.io/address/0xe879dcb80336363ff3b24f6504ffcbaca6bf50e8) |
 
 The deployed factory's runtime code equals this repository's build (solc 0.8.28, optimizer 200, cancun) with immutables
-masked. Live proof, 7 Oct 2026, from `examples/demo-agent.mjs`:
+masked, and both contracts are source-verified on the Arc explorer (8 Oct 2026); every box shows there as an EIP-1167
+clone of the verified MandateBox. Live proof, 7 Oct 2026, from `examples/demo-agent.mjs`:
 [x402 payment approved by the box](https://explorer.arc.io/tx/0x3eecb7ff6d3a026c73c02405395e3a11ef2f3bc8ebfed90375cdbdac8dd17df7),
 [direct payment](https://explorer.arc.io/tx/0xff60c87d8dd8a688fe25996418c3a735bbdb640350d5aa2f964734e0c0fda627),
 [over-limit payment refused on chain](https://explorer.arc.io/tx/0x2a2e7114306e5c4dcd4cc930a305478d65d2eb9e09460055de14cad404161bd2) (`Refused(6)`).

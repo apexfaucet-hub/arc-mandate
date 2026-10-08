@@ -175,9 +175,27 @@
   function remember(box) { try { var k = 'arc-mandate-boxes'; var l = JSON.parse(localStorage.getItem(k) || '[]'); if (l.indexOf(box) < 0) l.push(box); localStorage.setItem(k, JSON.stringify(l.slice(-20))); } catch (e) {} }
   function remembered() { try { return JSON.parse(localStorage.getItem('arc-mandate-boxes') || '[]'); } catch (e) { return []; } }
 
-  // Boxes this wallet owns: MandateCreated(box, owner, agent) logs, read in chunks Arc RPCs accept.
+  // Our server's record of the chain (tools/arc-mandate-index.js, every 10 min): boxes and the USDC that left them. Arc's public
+  // nodes keep ~70 h of logs and refuse wide ranges, so the browser alone could not list older boxes or payments. Used when it
+  // is fresh (under an hour old) and for this factory; otherwise the page reads the chain itself.
+  var INDEX = null;
+  function index() {
+    if (INDEX) return INDEX;
+    INDEX = fetch('/arc/mandate/index.json?t=' + Math.floor(Date.now() / 300000), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { return j && FACTORY && String(j.factory).toLowerCase() === FACTORY && Date.now() - Date.parse(j.updatedAt) < 3600000 ? j : null; })
+      .catch(function () { return null; });
+    return INDEX;
+  }
+  // Boxes this wallet owns: from the index, else MandateCreated(box, owner, agent) logs read in chunks Arc RPCs accept.
   function findMine() {
     if (!FACTORY || !me) return Promise.resolve([]);
+    return index().then(function (ix) {
+      if (ix) return ix.boxes.filter(function (b) { return String(b.owner).toLowerCase() === me; }).map(function (b) { return b.box; });
+      return findMineOnChain();
+    });
+  }
+  function findMineOnChain() {
     return rpc('eth_blockNumber', []).then(function (h) {
       var head = Number(h), out = [], from = FROM_BLOCK || Math.max(0, head - 90000), step = 90000;
       function next(start) {
@@ -198,8 +216,18 @@
           any: u(v[6]) === 1n, left: Number(u(v[7], 0)), leftValue: u(v[7], 1), balance: u(v[8]), genuine: u(v[9]) === 1n };
       });
   }
-  // Money that left the box: USDC Transfer logs from the box (agent payments by either path, and withdrawals).
+  // Money that left the box: USDC Transfer logs from the box (agent payments by either path, and withdrawals). From the index when
+  // it knows the box, else the chain's last ~12 h (the widest range the public nodes serve in one read).
   function outflows(box) {
+    var b = String(box).toLowerCase();
+    return index().then(function (ix) {
+      if (ix && ix.boxes.some(function (x) { return x.box === b; })) {
+        return (ix.outflows[b] || []).slice(0, 8).map(function (o) { return { to: o.to, value: BigInt(o.value), tx: o.tx }; });
+      }
+      return outflowsOnChain(box);
+    });
+  }
+  function outflowsOnChain(box) {
     return rpc('eth_blockNumber', []).then(function (h) {
       var head = Number(h), from = Math.max(FROM_BLOCK || 0, head - 90000);
       return rpc('eth_getLogs', [{ address: USDC, fromBlock: '0x' + from.toString(16), toBlock: '0x' + head.toString(16), topics: [T_TRANSFER, '0x' + addr(box)] }]);

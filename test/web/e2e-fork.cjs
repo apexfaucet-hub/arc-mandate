@@ -24,7 +24,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const factory = rc.contractAddress; const block = Number(rc.blockNumber);
     ok(!!factory, 'factory deployed on fork at ' + factory);
     const html = fs.readFileSync(path.join(ROOT, 'web', 'index.html'), 'utf8')
-      .replace('window.MANDATE={factory:null,deployBlock:0};', 'window.MANDATE={factory:"' + factory + '",deployBlock:' + block + ',rpcs:["' + A_URL + '"]};');
+      .replace(/window\.MANDATE=\{[^}]*\};/, 'window.MANDATE={factory:"' + factory + '",deployBlock:' + block + ',rpcs:["' + A_URL + '"]};');
+    // the live page carries the mainnet factory; the test must never run against it (it did once, silently, 8 Oct)
+    if (!html.includes(factory) || !html.includes(A_URL)) throw new Error('test page is not pointed at the fork');
     const js = fs.readFileSync(path.join(ROOT, 'web', 'mandate.js'), 'utf8');
     server = http.createServer((req, res) => {
       if (req.url.startsWith('/arc/mandate/mandate.js')) { res.writeHead(200, { 'content-type': 'application/javascript' }); return res.end(js); }
@@ -53,7 +55,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const sum = await page.$eval('#msum', (e) => e.textContent);
     ok(/at most 0\.10 USDC at a time and 20 times a day \(at most 2\.00 USDC a day\)/.test(sum), 'summary: ' + sum.slice(0, 120));
     await page.click('#mform button[type=submit]');
-    await page.waitForFunction(() => /Your box is live|Refused|Could not|failed|Not enough|must|Pick|Add at least/.test(document.getElementById('mmsg').textContent), { timeout: 60000 });
+    await page.waitForFunction(() => /Your box is live|Refused|Could not|failed|Not enough|must|Pick|Add at least/.test(document.getElementById('mmsg').textContent), { timeout: 60000 }).catch(async (e) => { console.log('mmsg at timeout: ' + await page.$eval('#mmsg', (x) => x.textContent)); throw e; });
     const msg = await page.$eval('#mmsg', (e) => e.textContent);
     ok(/Your box is live/.test(msg), 'create: ' + msg.slice(0, 140));
     await page.waitForFunction(() => /USDC in the box/.test(document.getElementById('mboxes').textContent), { timeout: 30000 });

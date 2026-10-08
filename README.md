@@ -1,5 +1,7 @@
 # arc-mandate
 
+[![tests](https://github.com/apexfaucet-hub/arc-mandate/actions/workflows/test.yml/badge.svg)](https://github.com/apexfaucet-hub/arc-mandate/actions/workflows/test.yml)
+
 **A spending box with rules for an AI agent, on Arc.**
 The owner puts USDC in and writes the rules. The agent pays for things by itself, but only inside those rules, and the
 contract checks every payment. The owner can stop the agent, change the rules or take everything back at any time. Nobody

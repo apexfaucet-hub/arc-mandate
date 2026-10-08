@@ -35,3 +35,4 @@ for f,old,new,label in M:
     if status!='CAUGHT': bad+=1
     print(f'{status:8} {label:32} failing: {", ".join(fails[:4])}')
 print('missed:',bad)
+sys.exit(1 if bad else 0)   # a planted fault that no test catches fails the run

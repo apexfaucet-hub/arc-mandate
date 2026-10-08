@@ -45,7 +45,6 @@
   .row2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;max-width:560px}
   .ex pre{white-space:pre-wrap;word-break:break-word;background:#FFFCF5;border:1px solid #D2BD8A;border-radius:12px;padding:12px;font-size:13px;color:#3b2d0c}
   html:not([data-theme="light"]) .ex pre{background:#17131A;border-color:#4A3A3D;color:#F3E6C2}
-  #mstate{border:2px dashed #B8912F;border-radius:14px;padding:10px 12px;margin:0 0 12px}
   html body:not(#a):not(#b):not(#c):not(#d):not(#e):not(#f) .ex button.pb{all:unset;box-sizing:border-box!important;cursor:pointer!important;background:#e7c766!important;color:#15110e!important;-webkit-text-fill-color:#15110e!important;border-radius:10px!important;padding:11px 16px!important;font-weight:700!important;margin:4px 6px 4px 0!important;display:inline-block!important}
   html body:not(#a):not(#b):not(#c):not(#d):not(#e):not(#f) .ex button.pb.ghost{background:transparent!important;color:inherit!important;-webkit-text-fill-color:currentColor!important;border:1px solid #B8912F!important}
 </style>
@@ -71,7 +70,6 @@
 
   <h2 id="create">Create a box</h2>
   <div class="pay" data-keep-color>
-    <p id="mstate" style="display:none"><b>Opening soon.</b> The contract is finished and tested; it opens for deposits after its review.</p>
     <form id="mform" autocomplete="off">
       <label for="fagent">Agent address<span class="hint">The wallet your agent signs with. It can spend from the box, never take it over.</span></label>
       <input type="text" id="fagent" name="agent" placeholder="0x…" spellcheck="false">

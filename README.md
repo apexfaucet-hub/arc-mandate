@@ -1,5 +1,7 @@
 # arc-mandate
 
+> **Moved, 12 Oct 2026:** this code, with its history, now also lives in [apexfaucet-hub/apex-treasury-operator](https://github.com/apexfaucet-hub/apex-treasury-operator) under `mandate/`, together with every other APEX contract on Arc mainnet. This repo stays open and is kept as it is.
+
 [![tests](https://github.com/apexfaucet-hub/arc-mandate/actions/workflows/test.yml/badge.svg)](https://github.com/apexfaucet-hub/arc-mandate/actions/workflows/test.yml)
 
 **A spending box with rules for an AI agent, on Arc.**
